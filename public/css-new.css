@@ -1,0 +1,49 @@
+ 
+/* css.css */
+
+/* General body styling */
+body {
+    background-color: #e5ddd5; /* Light background similar to WhatsApp */
+    font-family: Arial, sans-serif; /* Clean font for better readability */
+}
+
+/* Sidebar styling */
+.sidebar, nav {
+    background-color: #25D366; /* WhatsApp green */
+    color: white; /* Text color for better contrast */
+}
+
+/* Navigation links */
+.nav-link {
+    color: white; /* White text for links */
+}
+
+.nav-link:hover {
+    background-color: #128C7E; /* Darker green on hover */
+}
+
+/* Main content styling */
+h1 {
+    color: #25D366; /* WhatsApp green for headings */
+}
+
+/* Button styling */
+.btn-primary {
+    background-color: #25D366; /* WhatsApp green */
+    border-color: #25D366; /* Match border with button */
+}
+
+.btn-primary:hover {
+    background-color: #128C7E; /* Darker green on hover */
+    border-color: #128C7E; /* Match border with hover state */
+}
+
+/* Form input styling */
+.form-control {
+    border: 1px solid #25D366; /* Green border for input fields */
+}
+
+.form-control:focus {
+    border-color: #128C7E; /* Darker green on focus */
+    box-shadow: 0 0 5px rgba(36, 174, 96, 0.5); /* Subtle shadow effect */
+}
