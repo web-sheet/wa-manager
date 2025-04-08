@@ -4,7 +4,8 @@
   "main": "main.js",
   "type": "module",
   "scripts": {
-    "start": "nodemon main.js"
+    "start": "pm2 start main.js",
+    "stop": " pm2 stop main.js "
   },
   "keywords": [],
   "author": "",
