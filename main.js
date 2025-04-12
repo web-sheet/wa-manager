@@ -1,4 +1,4 @@
-import qrcode from "qrcode-terminal";
+ import qrcode from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
 import express from "express";
 import path from "path";
@@ -54,7 +54,8 @@ const clients = [];
 
 async function initializeClient(clientNumber, userType) {
   const client = new Client({ 
-    puppeteer: {
+  
+       puppeteer: {
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     },
@@ -102,55 +103,78 @@ async function initializeClient(clientNumber, userType) {
   await client.initialize();
   clients.push(client);
 
-  client.on("message_create", async (message) => {
-    const sender = message.from; 
+ 
+ 
+
+client.on("message_create", async (message) => {
+
+          if (message.from === client.info.wid._serialized) {
+            return; 
+           }
+
+
+    const sender_original = message.from; 
     const currentUser = message.to;  
 
-    const formattedCurrentUser = currentUser.split("@")[0];    
-    console.log("Message sent to:", formattedCurrentUser);
+    const formattedCurrentUser = currentUser.split("@")[0];     
+    const sender = sender_original.split("@")[0];  
+
+    if (message.body === 'ping') {
+        client.sendMessage(sender_original, 'pong');
+    } else if (message.type === 'location') {
   
-    const formattedSender = sender.split("@")[0]; // Extract sender number
-    const body = message.body;
-
-    if(message.type === 'chat' && sender !== 'status@broadcast') {
-
-      console.log(`Received message from ${formattedSender}: ${body}`);
-
-      const client = await User.findOne({ number: formattedCurrentUser });
-      console.log("Client found:", client);
+ 
+        const { latitude, longitude, url, name } = message.location;
+        console.log("Current User:", formattedCurrentUser);
+        console.log("Sender:", sender); 
+        console.log("Location:", latitude, longitude, "Url:", url, "Name :", name);
   
-      if (client && client.webhookUrl) {
-        try {
-          await fetch(client.webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              from: sender,
-              body: message.body,
-              timestamp: message.timestamp
-            })
-          });
-        } catch (error) {
-          console.error("Error sending message to webhook:", error);
+        const wa_client = await User.findOne({ number: formattedCurrentUser });
+        if (wa_client && wa_client.webhookUrl) {
+            try {
+                await fetch(wa_client.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },            
+                    body: JSON.stringify({ sender, latitude, longitude, url, name })             
+                });
+
+                console.log(message.id);
+                console.log("Location data sent to webhook successfully.");
+ 
+                const response = await fetch(`${wa_client.webhookUrl}?query=${sender}`); 
+                const data = await response.json();
+                if (data.response) {
+                    const reply = data.response.replace(/\\n/g, "\n");
+                    client.sendMessage(sender_original, reply);
+                }
+            } catch (error) {
+                console.error("Error processing message:", error);
+                client.sendMessage(sender_original, 'Sorry, I could not process your request.');
+            }
         }
-      }
-
-    }
-
-  });
+    } 
+});
+ 
 }
-
+ 
 app.post("/initializeClient", async (req, res) => {
   const { clientNumber, userType } = req.body;
-  const existingClient = clients.find((c) => c.info.wid.user === clientNumber);
-  
+
+  const existingUser = await User.findOne({ userType: userType });
+
+  if (existingUser) {
+    return res.status(400).send({ error: `Tidak bisa menambahkan device untuk username ${userType}. Hapus dulu device yang sudah ada. ` });
+  }
+
+  const existingClient = clients.find((c) => c.info.wid.user === clientNumber);  
   if (!existingClient) {
     await initializeClient(clientNumber, userType);
-    res.status(200).send({ result: `Client ${clientNumber} initialized` });
+    res.status(200).send({ result: `Device dengan username ${userType} telah ditambahkan.` });
   } else {
-    res.status(200).send({ result: `Client ${clientNumber} is already initialized` });
+    res.status(200).send({ result: `Device dengan username ${userType} telah ada.` });
   }
 });
+
 
 app.post("/updateWebhook", async (req, res) => {
   const { clientNumber, webhookUrl } = req.body;
@@ -161,10 +185,10 @@ app.post("/updateWebhook", async (req, res) => {
       { webhookUrl: webhookUrl }, // Update webhook URL
       { upsert: true }
     );
-    res.status(200).send({ result: `Webhook URL updated for client ${clientNumber}` });
+    res.status(200).send({ result: `Webhook URL telah diperbaharui untuk nomor ${clientNumber}` });
   } catch (error) {
     console.error(`Error updating webhook: ${error.message}`);
-    res.status(500).send({ error: "Failed to update webhook URL. Please try again." });
+    res.status(500).send({ error: "Gagal memperbaharui webhook URL. Mohon coba lagi." });
   }
 });
 
@@ -185,15 +209,15 @@ app.post("/logout/:clientNumber", async (req, res) => {
     const client = await User.findOne({ number: clientNumber });
 
     if (!client) {
-      return res.status(404).send({ error: "Client not found." });
+      return res.status(404).send({ error: "Nomor tidak ditemukan." });
     }
 
     await client.updateOne({ status: "offline" });
     io.emit("userDisconnected", { number: clientNumber });
-    res.status(200).send({ result: `Client ${clientNumber} logged out successfully.` });
+    res.status(200).send({ result: `Nomor ${clientNumber} berhasil logout.` });
   } catch (error) {
     console.error(`Error logging out client ${clientNumber}:`, error);
-    res.status(500).send({ error: "Failed to log out client." });
+    res.status(500).send({ error: "Logout gagal." });
   }
 });
 
@@ -208,10 +232,10 @@ app.delete("/deleteClient/:clientNumber", async (req, res) => {
     }
 
     await client.deleteOne();
-    res.status(200).send({ result: `Client ${clientNumber} deleted successfully.` });
+    res.status(200).send({ result: `Nomor ${clientNumber} berhasil dihapus.` });
   } catch (error) {
     console.error(`Error deleting client ${clientNumber}:`, error);
-    res.status(500).send({ error: "Failed to delete client." });
+    res.status(500).send({ error: "Gagal menghapus." });
   }
 });
 
@@ -230,7 +254,7 @@ app.post("/sendMessage", async (req, res) => {
 
   if (!client) {
     console.log("Client not found for sender:", sender);
-    return res.status(404).send({ error: "Client not found." });
+    return res.status(404).send({ error: "Tidak ada nomor pengirim tidak ditemukan." });
   }
 
   const formattedRecipient = `${to}@c.us`;
@@ -338,7 +362,7 @@ app.get('/index.html', isAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, 'protected', 'index.html'));
 });
 
-app.get('/register.html', isAuthenticated, isAuthorized('admin'), (req, res) => {
+app.get('/register.html',  (req, res) => {
   res.sendFile(path.join(__dirname, 'protected', 'register.html'));
 });
 
@@ -387,7 +411,7 @@ app.get('/checkSession', (req, res) => {
 });
 
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 9000;
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
